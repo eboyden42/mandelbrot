@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	screenWidth  = 500
-	screenHeight = 500
-	iterations   = 140
+	screenWidth  = 1000
+	screenHeight = 1000
+	iterations   = 300
 )
 
 var (
@@ -23,6 +23,7 @@ type Game struct {
 	screen                 *ebiten.Image
 	pixels                 []byte
 	xCenter, yCenter, size float64
+	autozoom, autoIn       bool
 }
 
 type PointCalculation struct {
@@ -47,25 +48,45 @@ func color(it int) (r, g, b byte) {
 
 func NewGame() *Game {
 	img := ebiten.NewImage(screenWidth, screenHeight)
-	game := Game{screen: img, pixels: make([]byte, screenWidth*screenHeight*4), xCenter: 0, yCenter: 0, size: 4}
+	game := Game{screen: img, pixels: make([]byte, screenWidth*screenHeight*4), xCenter: 0, yCenter: 0, size: 4, autozoom: false, autoIn: false}
 	return &game
 }
 
 func (g *Game) Update() error {
-	if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) {
+
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		g.yCenter += 0.05 * g.size
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
+	} else if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		g.yCenter -= 0.05 * g.size
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) {
+	} else if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		g.xCenter += 0.05 * g.size
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
+	} else if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		g.xCenter -= 0.05 * g.size
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyW) {
+	var keyPressed ebiten.Key
+	if ebiten.IsKeyPressed(ebiten.KeyW) || (g.autozoom && g.autoIn) {
 		g.size *= 9.0 / 10
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+		keyPressed = ebiten.KeyW
+	} else if ebiten.IsKeyPressed(ebiten.KeyS) || (g.autozoom && !g.autoIn) {
 		g.size *= 10.0 / 9.0
+		keyPressed = ebiten.KeyS
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyShiftLeft) {
+		if g.autozoom {
+			g.autozoom = false
+		} else {
+			g.autozoom = true
+			switch keyPressed {
+			case ebiten.KeyW:
+				g.autoIn = true
+			case ebiten.KeyS:
+				g.autoIn = false
+			default:
+				g.autozoom = false
+			}
+		}
 	}
 
 	g.calculateFractal(g.xCenter, g.yCenter, g.size)
@@ -110,13 +131,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.screen, nil)
 }
 
-func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh int) {
-	return 400, 400
+func (g *Game) Layout(outsideWidth, outsideHeight int) (width, height int) {
+	return screenWidth, screenHeight
 }
 
 func main() {
 	game := NewGame()
-	ebiten.SetWindowSize(screenWidth, screenHeight)
+
+	ebiten.SetWindowSize(screenWidth/2, screenHeight/2)
 	ebiten.SetWindowTitle("mandelbrot")
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
